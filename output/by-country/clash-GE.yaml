@@ -4,31 +4,31 @@ allow-lan: true
 mode: rule
 log-level: info
 proxies:
-- name: 🇮🇶 IQ 01 - xiaohe
+- name: 🇬🇪 GE 01 - xiaohe
   type: vless
-  server: port2.axiomed.ir
+  server: geo.shkola112.site
   port: 443
-  uuid: b825ccd6-f90c-4273-afe1-7f85b436a4a2
+  uuid: 76ac91c5-ea82-4046-8ee7-2ffbb563ac94
   udp: true
   tls: true
   skip-cert-verify: true
-  servername: eJtl1LB-mlYxNz0kO5Iz618MOTR0msa.FoRNEwIRAn-1011.WORkeRS.dEV
+  servername: geo.shkola112.site
   network: ws
   ws-opts:
-    path: /vl/6ayyVzPLRWVROzJKD82qZxn
+    path: /api-vless
     headers:
-      Host: ejtl1lb-mlyxnz0ko5iz618motr0msa.fornewiran-1011.workers.dev
+      Host: geo.shkola112.site
 proxy-groups:
 - name: PROXIES
   type: select
   proxies:
   - AUTO
-  - 🇮🇶 IQ 01 - xiaohe
+  - 🇬🇪 GE 01 - xiaohe
 - name: AUTO
   type: url-test
   url: https://www.google.com/generate_204
   interval: 300
   proxies:
-  - 🇮🇶 IQ 01 - xiaohe
+  - 🇬🇪 GE 01 - xiaohe
 rules:
 - MATCH,PROXIES
