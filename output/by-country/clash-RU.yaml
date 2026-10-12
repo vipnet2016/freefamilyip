@@ -6,18 +6,37 @@ log-level: info
 proxies:
 - name: 🇷🇺 俄罗斯 (Russia) 01 - xiaohe
   type: ss
-  server: 46.29.166.27
-  port: 20221
-  cipher: aes-256-gcm
-  password: 6b39ae3234dfd68b
+  server: 130.49.189.158
+  port: 43558
+  cipher: chacha20-ietf-poly1305
+  password: 52+ggoCvKFVJyT1NDiuWOZw2rHIvAg3tgqgJl8aeCwY=
   udp: true
 - name: 🇷🇺 俄罗斯 (Russia) 02 - xiaohe
-  type: ss
-  server: 176.32.35.102
-  port: 20111
-  cipher: aes-256-gcm
-  password: bdb313adf74c2ede
+  type: vless
+  server: codecanyon.net
+  port: 8880
+  uuid: 6e857db2-ea80-48e1-903f-d5cf557c21ff
   udp: true
+  tls: false
+  skip-cert-verify: true
+  network: ws
+  ws-opts:
+    path: /pyip=ProxyIP.US.CMLiussss.net
+    headers:
+      Host: silent-snow-1a0d.241-b0a.workers.dev
+- name: 🇷🇺 俄罗斯 (Russia) 03 - xiaohe
+  type: vless
+  server: 104.16.107.139
+  port: 8880
+  uuid: 24c2a873-4584-4c53-8679-61029682d0bb
+  udp: true
+  tls: false
+  skip-cert-verify: true
+  network: ws
+  ws-opts:
+    path: /pyip
+    headers:
+      Host: soft-thunder-bc22.111-f59.workers.dev
 proxy-groups:
 - name: PROXIES
   type: select
@@ -25,6 +44,7 @@ proxy-groups:
   - AUTO
   - 🇷🇺 俄罗斯 (Russia) 01 - xiaohe
   - 🇷🇺 俄罗斯 (Russia) 02 - xiaohe
+  - 🇷🇺 俄罗斯 (Russia) 03 - xiaohe
 - name: AUTO
   type: url-test
   url: https://www.google.com/generate_204
@@ -32,5 +52,6 @@ proxy-groups:
   proxies:
   - 🇷🇺 俄罗斯 (Russia) 01 - xiaohe
   - 🇷🇺 俄罗斯 (Russia) 02 - xiaohe
+  - 🇷🇺 俄罗斯 (Russia) 03 - xiaohe
 rules:
 - MATCH,PROXIES
