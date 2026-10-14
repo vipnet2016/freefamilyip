@@ -11,6 +11,7 @@ import shutil
 import socket
 import urllib.request
 import urllib.parse
+import urllib.error
 import subprocess
 import requests
 import yaml
@@ -35,10 +36,12 @@ OUTPUT_DIR = "output"
 COUNTRY_DIR = os.path.join(OUTPUT_DIR, "by-country")
 RESIDENTIAL_COUNTRY_DIR = os.path.join(OUTPUT_DIR, "residential-by-country")
 
+
 def ensure_directories():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     os.makedirs(COUNTRY_DIR, exist_ok=True)
     os.makedirs(RESIDENTIAL_COUNTRY_DIR, exist_ok=True)
+
 
 ensure_directories()
 
@@ -61,6 +64,7 @@ CLOUDFLARE_IP_NETWORKS = [
     ipaddress.ip_network("131.0.72.0/22"),
 ]
 
+
 def is_cloudflare_cdn_ip(ip_str):
     try:
         ip_obj = ipaddress.ip_address(ip_str)
@@ -71,9 +75,10 @@ def is_cloudflare_cdn_ip(ip_str):
         pass
     return False
 
+
 # 常见机房与数据中心 ASN
 DATACENTER_ASNS = {
-    13335, 16509, 14618, 15169, 396982, 8075, 24940, 16276, 
+    13335, 16509, 14618, 15169, 396982, 8075, 24940, 16276,
     14061, 31898, 63949, 45102, 132203, 20473, 60068, 55081,
     197540, 51167, 8560, 42708, 201814, 49981, 212238, 46652,
     141995, 200019, 136907, 39351, 9009, 174, 3356, 1299, 2914,
@@ -142,6 +147,7 @@ VALID_SS_CIPHERS = {
     "aes-256-ctr", "aes-128-cfb", "aes-192-cfb", "aes-256-cfb", "rc4-md5"
 }
 
+
 def get_country_flag(country_code):
     if not country_code or country_code.upper() in ["OTHER", "ZZ", "XX", "T1"]:
         return "🌐"
@@ -153,14 +159,32 @@ def get_country_flag(country_code):
         pass
     return "🌐"
 
-def safe_download(url, dest_path):
+
+def safe_download(url, dest_path, retries=5, timeout=60):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         'Accept': '*/*'
     }
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=30) as response, open(dest_path, 'wb') as out_file:
-        shutil.copyfileobj(response, out_file)
+
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                with open(dest_path, 'wb') as out_file:
+                    shutil.copyfileobj(response, out_file)
+            return
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            last_error = e
+            print(f"[!] 下载失败 ({attempt}/{retries}): {url} -> {e}")
+            if attempt == retries:
+                raise
+            sleep_s = min(2 ** attempt, 30)
+            time.sleep(sleep_s)
+
+    if last_error:
+        raise last_error
+
 
 def setup_environment():
     print("[*] 正在准备离线数据库与 Xray-core 内核...")
@@ -168,7 +192,7 @@ def setup_environment():
         safe_download("https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-Country.mmdb", "Country.mmdb")
     if not os.path.exists("ASN.mmdb"):
         safe_download("https://github.com/P3TERX/GeoLite.mmdb/raw/download/GeoLite2-ASN.mmdb", "ASN.mmdb")
-    
+
     if not os.path.exists("xray"):
         print("[*] 正在下载官方 Xray-core 测活内核...")
         safe_download("https://github.com/XTLS/Xray-core/releases/download/v1.8.24/Xray-linux-64.zip", "xray.zip")
@@ -177,6 +201,7 @@ def setup_environment():
         os.chmod("xray", 0o755)
         if os.path.exists("xray.zip"):
             os.remove("xray.zip")
+
 
 def extract_nodes_from_text(text):
     results = set()
@@ -196,6 +221,7 @@ def extract_nodes_from_text(text):
         clean = m.strip().rstrip(".,;\"')")
         results.add(clean)
     return results
+
 
 def fetch_raw_nodes():
     nodes = set()
@@ -218,6 +244,7 @@ def fetch_raw_nodes():
             print(f"[!] 拉取失败 {url}: {e}")
     print(f"[*] 初始抓取总量: {len(nodes)} 个")
     return list(nodes)
+
 
 def parse_node_to_xray_outbound(node_str):
     try:
@@ -274,7 +301,7 @@ def parse_node_to_xray_outbound(node_str):
             uuid_str = str(data.get("id", "")).strip()
             if not server or port <= 0:
                 return None, None, None, "vmess"
-            
+
             is_tls = data.get("tls") in ["tls", "1"]
             outbound = {
                 "protocol": "vmess",
@@ -309,7 +336,7 @@ def parse_node_to_xray_outbound(node_str):
             password, server, port_s, query = m.groups()
             port = int(port_s)
             params = dict(re.findall(r"([^=&#]+)=([^&#]*)", query))
-            
+
             outbound = {
                 "protocol": "trojan",
                 "settings": {
@@ -326,7 +353,7 @@ def parse_node_to_xray_outbound(node_str):
         elif node_str.startswith("ss://"):
             raw = node_str[5:].split("#")[0].strip()
             server, port, password, cipher = "", 0, "", ""
-            
+
             if "@" in raw:
                 user_info, host_info = raw.split("@", 1)
                 user_info += '=' * (-len(user_info) % 4)
@@ -379,6 +406,7 @@ def parse_node_to_xray_outbound(node_str):
     except Exception:
         pass
     return None, None, None, "unknown"
+
 
 def convert_to_clash_dict(node_str, name):
     try:
@@ -468,6 +496,7 @@ def convert_to_clash_dict(node_str, name):
         pass
     return None
 
+
 def test_single_node_xray(node_tuple):
     raw_node, server, port, proto = node_tuple
     outbound, _, _, _ = parse_node_to_xray_outbound(raw_node)
@@ -491,7 +520,7 @@ def test_single_node_xray(node_tuple):
         }],
         "outbounds": [outbound]
     }
-    
+
     with open(cfg_path, "w") as f:
         json.dump(config, f)
 
@@ -512,7 +541,6 @@ def test_single_node_xray(node_tuple):
         if resp.status_code in [200, 204]:
             delay_ms = int((time.time() - start_t) * 1000)
             if 30 < delay_ms < 6300:
-                # 严格通过代理穿透向公网 API 获取真实出网 IP
                 for check_url in ["https://api.ipify.org?format=json", "https://ip.seeip.org/json"]:
                     try:
                         ip_resp = requests.get(check_url, proxies=proxies, timeout=3.0)
@@ -524,8 +552,7 @@ def test_single_node_xray(node_tuple):
                                 break
                     except Exception:
                         pass
-                
-                # 若无法穿透拿到落地 IP，仅以普通可用出库，绝不打上真出口标签
+
                 if not exit_ip:
                     try:
                         exit_ip = socket.gethostbyname(server)
@@ -547,6 +574,7 @@ def test_single_node_xray(node_tuple):
         return (raw_node, server, port, proto, exit_ip, delay_ms, is_confirmed_exit)
     return None
 
+
 def run_real_delay_test_xray(candidates):
     print(f"[*] 启动 Xray 真实双向网络通道测活，候选节点数: {len(candidates)}...")
     alive = []
@@ -560,6 +588,7 @@ def run_real_delay_test_xray(candidates):
                     print(f"[+] 当前已确认真实通畅节点: {len(alive)} 个")
     print(f"[+] 测活完成！真实可用落地节点总数: {len(alive)}")
     return alive
+
 
 def rename_node_link(raw_link, new_name):
     try:
@@ -577,6 +606,7 @@ def rename_node_link(raw_link, new_name):
         pass
     return raw_link
 
+
 def get_rdns_host(ip):
     try:
         socket.setdefaulttimeout(1.2)
@@ -584,6 +614,7 @@ def get_rdns_host(ip):
         return host.lower()
     except Exception:
         return ""
+
 
 def is_verified_residential_offline(ip, org_str, asn):
     if asn in TRUE_RESIDENTIAL_ASNS:
@@ -593,12 +624,13 @@ def is_verified_residential_offline(ip, org_str, asn):
     for kw in IDC_KEYWORDS:
         if kw in info:
             return False
-            
+
     for r_kw in RESIDENTIAL_WHITELIST_KEYWORDS:
         if r_kw in info:
             return True
 
     return False
+
 
 def classify_and_filter(alive_nodes):
     country_reader = maxminddb.open_database("Country.mmdb")
@@ -618,7 +650,6 @@ def classify_and_filter(alive_nodes):
         except Exception:
             pass
 
-        # 核心拦截：如果未拿到经代理穿透的真实出网 IP，或命中 Cloudflare CDN，一票否决家宽属性
         if not is_confirmed_exit or is_cloudflare_cdn_ip(exit_ip):
             is_residential = False
         else:
@@ -627,7 +658,7 @@ def classify_and_filter(alive_nodes):
                 a = asn_reader.get(exit_ip)
                 asn = a.get("autonomous_system_number", 0) if a else 0
                 org = str(a.get("autonomous_system_organization", "")).lower() if a else ""
-                
+
                 if asn not in DATACENTER_ASNS:
                     is_residential = is_verified_residential_offline(exit_ip, org, asn)
             except Exception:
@@ -659,7 +690,6 @@ def classify_and_filter(alive_nodes):
     country_reader.close()
     asn_reader.close()
 
-    # 关键防线：普通池保留不同配置，家宽专区强制单 IP 严格去重（杜绝 40 个重复高危 IP 刷屏）
     unique_all = []
     seen_all = set()
     seen_res_ips = set()
@@ -669,8 +699,7 @@ def classify_and_filter(alive_nodes):
         all_key = f"{item['proto']}://{item['exit_ip']}:{item['port']}_{hash(link_core)}"
         if all_key not in seen_all:
             seen_all.add(all_key)
-            
-            # 若标记为家宽，但该物理出口 IP 已存在，直接降级为普通节点，绝不重复生成
+
             if item["is_residential"]:
                 if item["exit_ip"] in seen_res_ips:
                     item["is_residential"] = False
@@ -680,6 +709,7 @@ def classify_and_filter(alive_nodes):
 
     print(f"[*] 智能去重与家宽防刷完成，出库总节点: {len(unique_all)} 个，纯净独立家宽: {len(seen_res_ips)} 个")
     return unique_all
+
 
 def export_clash_yaml(clash_proxies, filepath):
     names = [p["name"] for p in clash_proxies]
@@ -699,6 +729,7 @@ def export_clash_yaml(clash_proxies, filepath):
     with open(filepath, "w", encoding="utf-8") as f:
         yaml.dump(config, f, allow_unicode=True, sort_keys=False)
 
+
 def export_singbox_json(clash_proxies, filepath):
     names = [p["name"] for p in clash_proxies]
     outbounds = [
@@ -711,41 +742,41 @@ def export_singbox_json(clash_proxies, filepath):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
+
 def format_node_group(nodes_list, res_tag_force=False):
     formatted_links = []
     formatted_proxies = []
-    
+
     for idx, item in enumerate(nodes_list, start=1):
         cc = item["country"]
         flag = get_country_flag(cc)
         c_name = COUNTRY_NAMES.get(cc, cc)
-        
+
         is_res = item["is_residential"] or res_tag_force
         tag = " (家宽)" if is_res else ""
         node_name = f"{flag} {c_name} {idx:02d}{tag} - xiaohe"
-        
+
         new_proxy = dict(item["clash_proxy"])
         new_proxy["name"] = node_name
         formatted_proxies.append(new_proxy)
-        
+
         new_link = rename_node_link(item["link"], node_name)
         formatted_links.append(new_link)
-        
+
     return formatted_links, formatted_proxies
+
 
 def export_subscriptions(verified_nodes):
     ensure_directories()
     residential_nodes = [n for n in verified_nodes if n["is_residential"]]
     non_residential_nodes = [n for n in verified_nodes if not n["is_residential"]]
 
-    # 1. 导出全量总订阅
     all_links, all_proxies = format_node_group(verified_nodes)
     with open(os.path.join(OUTPUT_DIR, "v2ray.txt"), "w", encoding="utf-8") as f:
         f.write(base64.b64encode("\n".join(all_links).encode()).decode())
     export_clash_yaml(all_proxies, os.path.join(OUTPUT_DIR, "clash.yaml"))
     export_singbox_json(all_proxies, os.path.join(OUTPUT_DIR, "singbox.json"))
 
-    # 2. 导出家宽总订阅
     res_links, res_proxies = format_node_group(residential_nodes, res_tag_force=True)
     with open(os.path.join(OUTPUT_DIR, "residential.txt"), "w", encoding="utf-8") as f:
         f.write(base64.b64encode("\n".join(res_links).encode()).decode())
@@ -757,7 +788,6 @@ def export_subscriptions(verified_nodes):
             p = os.path.join(OUTPUT_DIR, f)
             if os.path.exists(p): os.remove(p)
 
-    # 3. 按国家分类【非家宽/机房】
     shutil.rmtree(COUNTRY_DIR, ignore_errors=True)
     os.makedirs(COUNTRY_DIR, exist_ok=True)
     by_cc = {}
@@ -771,7 +801,6 @@ def export_subscriptions(verified_nodes):
         export_clash_yaml(c_proxies, os.path.join(COUNTRY_DIR, f"clash-{cc}.yaml"))
         export_singbox_json(c_proxies, os.path.join(COUNTRY_DIR, f"singbox-{cc}.json"))
 
-    # 4. 按国家分类【真家宽】
     shutil.rmtree(RESIDENTIAL_COUNTRY_DIR, ignore_errors=True)
     os.makedirs(RESIDENTIAL_COUNTRY_DIR, exist_ok=True)
     res_by_cc = {}
@@ -788,10 +817,11 @@ def export_subscriptions(verified_nodes):
     print(f"[*] 导出完毕！全量真活: {len(all_links)} | 家宽真活: {len(res_links)}")
     return len(all_links), len(res_links)
 
+
 def update_readme():
     repo_name = os.environ.get("GITHUB_REPOSITORY", "hezhanleiok/freesub").strip()
     cache_bust = int(time.time())
-    
+
     def count_file(path):
         if not os.path.exists(path):
             return 0
@@ -880,7 +910,7 @@ export default {
     const url = new URL(request.url);
     const filePath = "output" + url.pathname;
     const ghUrl = "[https://raw.githubusercontent.com/](https://raw.githubusercontent.com/)" + OWNER + "/" + REPO + "/" + BRANCH + "/" + filePath;
-    
+
     const res = await fetch(ghUrl, {
       headers: {
         "Authorization": "token " + GITHUB_TOKEN,
@@ -893,9 +923,9 @@ export default {
     }
 
     return new Response(await res.text(), {
-      headers: { 
+      headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache" 
+        "Cache-Control": "no-cache"
       }
     });
   }
@@ -905,7 +935,7 @@ export default {
     readme_content = f"""# 🚀 免费节点自动测活订阅池 (含真实家宽/住宅IP甄选)
 
 > 👤 **定制规范命名**: 所有订阅节点均重命名为 `国旗 地区 序号 (家宽) - xiaohe`  
-> ⚡ **真实可用保障**: 所有节点由 `Xray-core` 建立实际代理隧道并完成真实 HTTPS 双向传输握手，拒绝虚假通畅与死节点。无论是通过免翻 CDN 直链还是官方原生 Raw 直链拉取，节点命名格式完全一致。
+> ⚡ **真实可用保障**: 所有节点由 `Xray-core` 建立实际代理隧道并完成真实 HTTPS 双向传输握手，拒绝虚假通畅与死节点。无论是通过免翻 CDN 直链还是 Raw 直链，确保真实可用。
 
 ---
 
@@ -938,7 +968,7 @@ export default {
 
 ## 🔒 私有仓库（Private）无感免翻订阅方案 (基于 Cloudflare Workers)
 
-> 如果你希望将本 GitHub 仓库设置为 **Private (私有仓库)** 保护节点资产，外部客户端无法直接拉取原生 Raw 或公共 CDN 链接，可以通过以下 Cloudflare Worker 搭建轻量级私密网关反代：
+> 如果你希望将本 GitHub 仓库设置为 **Private (私有仓库)** 保护节点资产，外部客户端无法直接拉取原生 Raw 或公共 CDN 链接，可以通过以下 Cloudflare Worker 方案无感代理访问。
 
 ### 1. 获取 GitHub 永久个人令牌 (PAT)
 1. 进入 GitHub -> **Settings** -> **Developer Settings** -> **Personal access tokens (classic)**。
@@ -977,6 +1007,7 @@ export default {
     with open("README.md", "w", encoding="utf-8") as f:
         f.write(readme_content)
     print(f"[+] README.md 实时动态表格更新完毕！真实总节点: {total_count}, 真实家宽: {res_count}")
+
 
 if __name__ == "__main__":
     setup_environment()
