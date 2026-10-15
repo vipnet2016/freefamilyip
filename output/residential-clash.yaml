@@ -4,23 +4,24 @@ allow-lan: true
 mode: rule
 log-level: info
 proxies:
-- name: 🇹🇼 中国台湾 (Taiwan) 01 (家宽) - xiaohe
+- name: 🇰🇷 韩国 (South Korea) 01 (家宽) - xiaohe
+  type: ss
+  server: ce1fc2d8.krkt.hkssip.com
+  port: 49642
+  cipher: aes-256-gcm
+  password: ac9c0a7b
+  udp: true
+- name: 🇭🇰 中国香港 (Hong Kong) 02 (家宽) - xiaohe
   type: vmess
-  server: fujrdt.d6f54hd1j.cc
-  port: 443
-  uuid: d877dc6f-7323-4b47-a7dd-14228cbae854
+  server: dog-hk.kunlun01dns.com
+  port: 21022
+  uuid: 9464ca40-dd75-3742-a628-d931a9f413b2
   alterId: 0
   cipher: auto
   udp: true
-  tls: true
+  tls: false
   skip-cert-verify: true
-  servername: fujrdt.d6f54hd1j.cc
-  network: ws
-  ws-opts:
-    path: /
-    headers:
-      Host: fujrdt.d6f54hd1j.cc
-- name: 🇹🇼 中国台湾 (Taiwan) 02 (家宽) - xiaohe
+- name: 🇹🇼 中国台湾 (Taiwan) 03 (家宽) - xiaohe
   type: vless
   server: 60.248.219.78
   port: 443
@@ -39,14 +40,16 @@ proxy-groups:
   type: select
   proxies:
   - AUTO
-  - 🇹🇼 中国台湾 (Taiwan) 01 (家宽) - xiaohe
-  - 🇹🇼 中国台湾 (Taiwan) 02 (家宽) - xiaohe
+  - 🇰🇷 韩国 (South Korea) 01 (家宽) - xiaohe
+  - 🇭🇰 中国香港 (Hong Kong) 02 (家宽) - xiaohe
+  - 🇹🇼 中国台湾 (Taiwan) 03 (家宽) - xiaohe
 - name: AUTO
   type: url-test
   url: https://www.google.com/generate_204
   interval: 300
   proxies:
-  - 🇹🇼 中国台湾 (Taiwan) 01 (家宽) - xiaohe
-  - 🇹🇼 中国台湾 (Taiwan) 02 (家宽) - xiaohe
+  - 🇰🇷 韩国 (South Korea) 01 (家宽) - xiaohe
+  - 🇭🇰 中国香港 (Hong Kong) 02 (家宽) - xiaohe
+  - 🇹🇼 中国台湾 (Taiwan) 03 (家宽) - xiaohe
 rules:
 - MATCH,PROXIES

@@ -4,31 +4,30 @@ allow-lan: true
 mode: rule
 log-level: info
 proxies:
-- name: 🇨🇿 CZ 01 - xiaohe
+- name: 🇧🇾 BY 01 - xiaohe
   type: vless
-  server: 162.159.152.4
-  port: 443
-  uuid: f2a73750-3087-48ff-a763-1348c15dce68
+  server: 95.128.71.79
+  port: 14430
+  uuid: 8cef7621-c6f0-486e-b51d-59c30c5b0b25
   udp: true
-  tls: true
+  tls: false
   skip-cert-verify: true
-  servername: rayan-007.maxima.dpdns.org
   network: ws
   ws-opts:
-    path: /
+    path: /vless
     headers:
-      Host: rayan-007.maxima.dpdns.org
+      Host: 95.128.71.79
 proxy-groups:
 - name: PROXIES
   type: select
   proxies:
   - AUTO
-  - 🇨🇿 CZ 01 - xiaohe
+  - 🇧🇾 BY 01 - xiaohe
 - name: AUTO
   type: url-test
   url: https://www.google.com/generate_204
   interval: 300
   proxies:
-  - 🇨🇿 CZ 01 - xiaohe
+  - 🇧🇾 BY 01 - xiaohe
 rules:
 - MATCH,PROXIES
