@@ -12,12 +12,12 @@ proxies:
   udp: true
   tls: true
   skip-cert-verify: true
-  servername: devcdn.icu
+  servername: e3.cdnwh.icu
   network: ws
   ws-opts:
     path: /edge/chunk/b2265efffa29/
     headers:
-      Host: devcdn.icu
+      Host: e3.cdnwh.icu
 proxy-groups:
 - name: PROXIES
   type: select
